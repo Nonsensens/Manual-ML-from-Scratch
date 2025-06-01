@@ -1,0 +1,181 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": []
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "code",
+      "source": [
+        "import numpy as np\n",
+        "import pandas as pd"
+      ],
+      "metadata": {
+        "id": "FS10Zp7yRY0a"
+      },
+      "execution_count": 35,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from sklearn.datasets import load_iris\n",
+        "from sklearn.preprocessing import StandardScaler"
+      ],
+      "metadata": {
+        "id": "4Kjmt1bGR3Fg"
+      },
+      "execution_count": 232,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# Linear Regression"
+      ],
+      "metadata": {
+        "id": "aM0roffwOhYY"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "class LinearRegression:\n",
+        "  def __init__(self, method='matrix', _intercept=True, lr=None, n_iters=None):\n",
+        "    self.method = method\n",
+        "    self._intercept = _intercept\n",
+        "    self.lr = lr\n",
+        "    self.n_iters = n_iters\n",
+        "    self.W = None\n",
+        "\n",
+        "  def fit(self, X, y):\n",
+        "    if type(X) != np.ndarray:\n",
+        "      X = X.to_numpy().reshape(-1, X.shape[1])\n",
+        "    if type(y) != np.ndarray:\n",
+        "      y = y.to_numpy()\n",
+        "\n",
+        "    y = y.reshape(-1, 1)\n",
+        "\n",
+        "    self.scaler_x = StandardScaler()\n",
+        "    self.scaler_y = StandardScaler()\n",
+        "\n",
+        "    X = self.scaler_x.fit_transform(X)\n",
+        "    y = self.scaler_y.fit_transform(y)\n",
+        "\n",
+        "    if self.method == 'matrix':\n",
+        "      if self._intercept:\n",
+        "          X = np.column_stack([np.ones(X.shape[0]), X])\n",
+        "          self.W = np.linalg.pinv(X.T @ X) @ X.T @ y\n",
+        "          self.b = self.W[0]\n",
+        "          self.W = self.W[1:]\n",
+        "      else:\n",
+        "          self.W = np.linalg.pinv(X.T @ X) @ X.T @ y\n",
+        "          self.b = 0\n",
+        "\n",
+        "    else:\n",
+        "      if self.lr is None or self.n_iters is None:\n",
+        "        raise ValueError(\"For gradient descent you must specify lr and n_iters\")\n",
+        "\n",
+        "      self.W = np.random.randn(X.shape[1]).reshape(-1, 1)\n",
+        "      self.b = 0\n",
+        "      for epoch in range(self.n_iters):\n",
+        "        z = X @ self.W + self.b\n",
+        "        loss = np.mean((y-z)**2)\n",
+        "\n",
+        "        dL_dz = -2*(y - z) / X.shape[0]\n",
+        "        dL_dW = X.T @ dL_dz\n",
+        "        dL_db = np.sum(dL_dz)\n",
+        "\n",
+        "        self.W -= dL_dW * self.lr\n",
+        "        self.b -= dL_db * self.lr\n",
+        "\n",
+        "\n",
+        "  def predict(self, X):\n",
+        "    if not self.W:\n",
+        "      raise ValueError(\"This model have not fitted yet\")\n",
+        "    if type(X) != np.ndarray:\n",
+        "        X = X.to_numpy().reshape(-1, X.shape[1])\n",
+        "    X = self.scaler_x.fit_transform(X)\n",
+        "    return self.scaler_y.inverse_transform(X @ self.W + self.b)"
+      ],
+      "metadata": {
+        "id": "SjG27SWdKD5Q"
+      },
+      "execution_count": 382,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# Logistic regression"
+      ],
+      "metadata": {
+        "id": "p26zKm6OOkmh"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "class LogisticRegression:\n",
+        "  def __init__(self, lr=0.003, n_iters=5000):\n",
+        "    self.lr = lr\n",
+        "    self.n_iters = n_iters\n",
+        "    self.W = None\n",
+        "    self.b = None\n",
+        "\n",
+        "  def softmax(self, z):\n",
+        "      return np.exp(z) / np.sum(np.exp(z), axis=1, keepdims=True)\n",
+        "\n",
+        "  def CE(self, y, t):\n",
+        "      return -np.mean(y*np.log(t))\n",
+        "\n",
+        "  def one_hot(self, y):\n",
+        "    num_classes = len(np.unique(y))\n",
+        "    return np.eye(num_classes)[y]\n",
+        "\n",
+        "  def fit(self, X, y):\n",
+        "    if type(X) != np.ndarray:\n",
+        "      X = X.to_numpy().reshape(-1, X.shape[1])\n",
+        "    if type(y) != np.ndarray:\n",
+        "      y = y.to_numpy()\n",
+        "    y = self.one_hot(y)\n",
+        "    self.W = np.random.randn(X.shape[1], y.shape[1])\n",
+        "    self.b = 0\n",
+        "\n",
+        "    for epoch in range(self.n_iters):\n",
+        "      z = X @ self.W + self.b\n",
+        "      t = self.softmax(z)\n",
+        "      loss = self.CE(y, t)\n",
+        "\n",
+        "      E = (t - y)\n",
+        "      dL_dw = (X.T @ E) / len(X)\n",
+        "      dL_db = np.sum(E) / len(X)\n",
+        "\n",
+        "      self.W -= dL_dw * self.lr\n",
+        "      self.b -= dL_db * self.lr\n",
+        "\n",
+        "  def predict(self, X):\n",
+        "    if not self.W:\n",
+        "      raise ValueError(\"This model have not fitted yet\")\n",
+        "    return self.softmax(X @ self.W + self.b)\n",
+        "\n",
+        ""
+      ],
+      "metadata": {
+        "id": "yjXyUgn7-nWv"
+      },
+      "execution_count": 650,
+      "outputs": []
+    }
+  ]
+}
